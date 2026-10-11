@@ -15,6 +15,6 @@ export class InviteUserDto {
   role?: 'EMPLOYEE';
 
   @IsString()
-  @MinLength(8)
+  @MinLength(1)
   temporaryPassword!: string;
 }

@@ -329,7 +329,6 @@ export default function ManagementPage() {
           <input
             required
             type="password"
-            minLength={8}
             value={invitePassword}
             onChange={(e) => setInvitePassword(e.target.value)}
             placeholder="Temporary password"
