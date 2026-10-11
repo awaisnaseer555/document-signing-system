@@ -53,3 +53,4 @@ frontend/out/
 .vercel
 .railway
 .render/
+.env*

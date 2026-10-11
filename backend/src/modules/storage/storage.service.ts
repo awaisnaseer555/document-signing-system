@@ -3,9 +3,9 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { getMaxPdfBytes, getMaxPdfLabel } from '../../common/upload-limits';
 import { SupabaseService } from '../supabase/supabase.service';
 
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 120;
 
 @Injectable()
@@ -16,8 +16,9 @@ export class StorageService {
     if (!file) {
       throw new BadRequestException('PDF file is required');
     }
-    if (file.size > MAX_PDF_BYTES) {
-      throw new BadRequestException('PDF exceeds 25MB limit');
+    const maxBytes = getMaxPdfBytes();
+    if (file.size > maxBytes) {
+      throw new BadRequestException(`PDF exceeds ${getMaxPdfLabel()} limit`);
     }
     const name = file.originalname?.toLowerCase() ?? '';
     const mimeOk =

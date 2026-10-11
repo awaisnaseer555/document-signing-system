@@ -19,6 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { getMaxPdfBytes } from '../../common/upload-limits';
 import { AuthUser } from '../../common/types';
 import { DocumentsService } from './documents.service';
 
@@ -42,7 +43,7 @@ export class DocumentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: 25 * 1024 * 1024 },
+      limits: { fileSize: getMaxPdfBytes() },
     }),
   )
   upload(

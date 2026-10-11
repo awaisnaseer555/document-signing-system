@@ -2,114 +2,126 @@
 
 ## Compatibility verdict
 
-This NestJS **11** app (`@nestjs/platform-express`) **can** run on Vercel as a **single Fluid/serverless function**.
+**Compatible with caveats.** This NestJS **11** + Express app can run on Vercel as a single Fluid/serverless function using [official NestJS support](https://vercel.com/docs/frameworks/backend/nestjs) (`src/main.ts` + `listen()`). No custom adapter.
 
-Vercel has [official NestJS support](https://vercel.com/docs/frameworks/backend/nestjs): keep `src/main.ts` with `NestFactory.create` + `app.listen()`. **No custom serverless adapter is required** for this stack.
+| Works well | Constrained |
+|------------|-------------|
+| Auth (`/api/auth/me`), users, assignments, audit | Multipart PDF upload body size (~**4 MB** on Vercel) |
+| Supabase Auth JWT + service-role DB/Storage | Function timeout (Hobby ~10s; raise if on Pro) |
+| Signature flow for small PDFs (memory → Supabase) | Cold starts; in-memory throttler not global |
 
-Smallest reliable approach for this monorepo:
+Local `npm run start:dev` / `start:prod` is unchanged (25 MB PDF limit locally).
 
-1. **Separate Vercel project** for the API (do not mix with the Next.js project).
-2. Set **Root Directory** = `backend`.
-3. Framework = NestJS (auto-detected via `src/main.ts` + `backend/vercel.json`).
-4. Put **server secrets only** on the API project (never on the frontend project).
-
-Local `npm run start:dev` / `npm run start:prod` is unchanged.
-
----
-
-## Limitations (important)
-
-| Concern | Impact on this app |
-|--------|---------------------|
-| **Request body size** | Vercel Functions typically cap request bodies around **~4.5 MB**. The API still validates up to 25 MB in code, but **large PDF uploads via multipart will fail on Vercel**. Keep uploaded PDFs small (under ~4 MB) or later move to direct-to-Supabase signed uploads. |
-| **Timeouts** | Hobby plans often allow **~10s**; Pro can raise **maxDuration** (e.g. 60s). PDF download + `pdf-lib` signing + dual Storage uploads can approach limits for large files. Raise **Function Max Duration** in the API project settings. |
-| **Cold starts** | First request after idle bootstraps Nest + modules — expect higher latency (~1–3s+). |
-| **Memory** | `pdf-lib` + PDF buffers need RAM; prefer **1024 MB** function memory if available. |
-| **Throttling** | `@nestjs/throttler` is **in-memory per instance** — not a shared rate-limit store across isolates. |
-| **No local disk** | Fine here: uploads use **multer memoryStorage** and Supabase Storage. |
-| **Swagger** | `/api/docs` works but adds bundle/cold-start cost. |
-
-Electronic signatures remain **application evidence of intent**, not a legal validity claim.
+If you later need large PDFs or long-running jobs without Vercel Pro, easiest **no credit-card** alternatives are typically a free-tier VM (e.g. Oracle Cloud Always Free) or a platform that still offers free Nest hosting without a card — not a rewrite of this API.
 
 ---
 
-## Exact Vercel project settings (API)
+## Exact environment variables
 
-Create a **new** Vercel project linked to the **same GitHub repo**.
+### Backend Vercel project (secrets — server only)
 
-| Setting | Value |
-|--------|--------|
-| Framework Preset | NestJS (or Other → NestJS) |
-| **Root Directory** | `backend` |
-| Build Command | `npm run build` (from `vercel.json`) |
-| Install Command | `npm install` |
-| Output / Node | Leave default (NestJS Fluid function) |
-| Region | `sin1` (matches current frontend edge region) |
-| Function Max Duration | **60** (Pro) or highest available on your plan |
+| Variable | Required | Example |
+|----------|----------|---------|
+| `FRONTEND_ORIGIN` | Yes (recommended) | `https://document-signing-system-six.vercel.app` |
+| `SUPABASE_URL` | Yes | `https://xxxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | Yes | anon/publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | **service_role** (never in frontend) |
+| `PORT` | No | Injected by Vercel |
 
-### Environment variables (API project only)
+Comma-separate origins if needed:
+`http://localhost:3000,https://document-signing-system-six.vercel.app`
 
-```env
-FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
+### Frontend Vercel project (public only)
 
-Optional: `PORT` is injected by Vercel — you do not need to set it.
-
-**Never** add `SUPABASE_SERVICE_ROLE_KEY` to the Next.js Vercel project.
-
-### Frontend project (already deployed)
-
-Set / update:
-
-```env
-NEXT_PUBLIC_API_URL=https://YOUR-API-PROJECT.vercel.app/api
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-```
-
-Then **redeploy** the frontend so the public API URL is baked in.
-
-CORS: `FRONTEND_ORIGIN` on the API must exactly match the browser origin (no trailing slash; comma-separate if multiple).
+| Variable | Required | Example |
+|----------|----------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | same Supabase URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | anon key only |
+| `NEXT_PUBLIC_API_URL` | Yes | `https://YOUR-API-PROJECT.vercel.app/api` |
 
 ---
 
-## Deployment commands (manual — do not auto-run)
+## Step-by-step: deploy API on Vercel
 
-From a machine with Vercel CLI logged in:
+### A) Dashboard (recommended)
+
+1. Push this repo to GitHub (if not already), including `backend/vercel.json` and recent Nest entry files.
+2. Open [vercel.com](https://vercel.com) → **Add New… → Project** → import **the same repo** used by the frontend.
+3. Configure:
+   - **Root Directory:** `backend` (Edit → select `backend`)
+   - **Framework Preset:** NestJS
+   - **Build Command:** `npm run build`
+   - **Install Command:** `npm install`
+4. **Environment Variables** (Production):
+
+   ```
+   FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app
+   SUPABASE_URL=<from Supabase Project Settings → API>
+   SUPABASE_ANON_KEY=<anon key>
+   SUPABASE_SERVICE_ROLE_KEY=<service_role key>
+   ```
+
+5. Deploy. Note the URL, e.g. `https://document-signing-api-xxx.vercel.app`.
+6. Smoke test (in browser or curl):
+
+   ```
+   https://YOUR-API-PROJECT.vercel.app/api/health
+   https://YOUR-API-PROJECT.vercel.app/api/docs
+   ```
+
+7. Open the **frontend** Vercel project → Settings → Environment Variables → set:
+
+   ```
+   NEXT_PUBLIC_API_URL=https://YOUR-API-PROJECT.vercel.app/api
+   ```
+
+8. **Redeploy** the frontend (Deployments → … → Redeploy). Login should call `/api/auth/me` successfully.
+
+### B) CLI
 
 ```bash
-# One-time: link a NEW project to backend/
 cd backend
 npx vercel login
 npx vercel link
-# When prompted: create new project, Root Directory = backend (or link after setting Root in dashboard)
+# Create a NEW project (do not reuse the Next.js project). Root = backend.
 
-# Preview
-npx vercel
+# Set env vars (or set them in the dashboard)
+npx vercel env add FRONTEND_ORIGIN production
+npx vercel env add SUPABASE_URL production
+npx vercel env add SUPABASE_ANON_KEY production
+npx vercel env add SUPABASE_SERVICE_ROLE_KEY production
 
-# Production
-npx vercel --prod
+npx vercel          # preview
+npx vercel --prod   # production
 ```
 
-Or: Vercel Dashboard → Add New Project → import repo → Root Directory `backend` → add env vars → Deploy.
-
-### Smoke tests after deploy
-
-```bash
-curl https://YOUR-API-PROJECT.vercel.app/api/health
-# open https://YOUR-API-PROJECT.vercel.app/api/docs
-```
-
-Then sign in on the frontend; `/api/auth/me` must succeed (no Failed to fetch).
+Then update the frontend project’s `NEXT_PUBLIC_API_URL` and redeploy the UI.
 
 ---
 
-## What was changed in the repo
+## CORS
 
-- `src/create-app.ts` — shared Nest configuration (`/api` prefix, CORS, validation, Swagger)
-- `src/main.ts` — thin local/Vercel entry that `listen()`s (required by Vercel NestJS detection)
-- `vercel.json` — NestJS framework + install/build + `sin1`
-- ConfigModule `ignoreEnvFile` when `VERCEL=1` so production uses dashboard secrets only
+Configured in `src/create-app.ts` from `FRONTEND_ORIGIN`.
+
+- On Vercel API project, set `FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app` (no trailing slash).
+- If unset, defaults include `http://localhost:3000` and `https://document-signing-system-six.vercel.app`.
+
+---
+
+## PDF / serverless notes
+
+- Uploads use **multer memoryStorage** (no local disk) → OK for serverless.
+- Files go to **private Supabase Storage**; clients use short-lived signed URLs.
+- On Vercel (`VERCEL=1`), max PDF is capped at **4 MB** so failures return a clear API error instead of an opaque platform 413.
+- Keep signing PDFs small on Hobby plan to avoid timeouts.
+
+---
+
+## Repo files used for Vercel
+
+- `backend/vercel.json` — framework NestJS, build, region `sin1`
+- `backend/src/main.ts` — entry with `listen()` (Vercel NestJS detection)
+- `backend/src/create-app.ts` — `/api` prefix, CORS, validation, Swagger
+- ConfigModule ignores `.env` when `VERCEL=1` (dashboard secrets only)
+
+**Do not claim deploy success until `/api/health` returns OK and frontend login works against the live API URL.**

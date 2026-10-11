@@ -16,8 +16,10 @@ export async function createApp(): Promise<INestApplication> {
   });
 
   const configService = app.get(ConfigService);
+  // Local defaults + production frontend. Override via FRONTEND_ORIGIN (comma-separated).
   const frontendOrigin =
-    configService.get<string>('FRONTEND_ORIGIN') ?? 'http://localhost:3000';
+    configService.get<string>('FRONTEND_ORIGIN') ??
+    'http://localhost:3000,https://document-signing-system-six.vercel.app';
 
   const allowedOrigins = frontendOrigin
     .split(',')

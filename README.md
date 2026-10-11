@@ -119,31 +119,22 @@ NEXT_PUBLIC_API_URL=https://YOUR-API.onrender.com/api
 
 `NEXT_PUBLIC_API_URL` must **not** be `http://localhost:3001/api` on Vercel — that causes **Failed to fetch** after login.
 
-### Backend on Vercel (recommended for this monorepo)
+### Backend on Vercel (no Render / no credit card)
 
-Use a **second** Vercel project with **Root Directory** = `backend` (NestJS 11 Fluid function — no Render/Railway required). Details: [`docs/VERCEL_BACKEND.md`](./docs/VERCEL_BACKEND.md).
+Use a **second** Vercel project → **Root Directory** = `backend`. Full checklist: [`docs/VERCEL_BACKEND.md`](./docs/VERCEL_BACKEND.md).
+
+| Project | Key env |
+|---------|---------|
+| API (`backend/`) | `FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
+| Frontend (`frontend/`) | `NEXT_PUBLIC_API_URL=https://YOUR-API.vercel.app/api` (+ public Supabase vars) |
 
 ```bash
 cd backend
-npx vercel link   # new project, root = backend
+npx vercel link    # NEW project, root backend
 npx vercel --prod
+# then set NEXT_PUBLIC_API_URL on the frontend project and redeploy UI
 ```
 
-API env (server only):
-
-```env
-FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app
-SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-```
-
-Frontend env:
-
-```env
-NEXT_PUBLIC_API_URL=https://YOUR-API-PROJECT.vercel.app/api
-```
-
-Then redeploy the frontend. Never put the service role key on the Next.js project.
+Never put the service role key on the Next.js project. Verify `/api/health` before calling deploy “done”.
 
 Do not deploy or push without explicit authorization.
