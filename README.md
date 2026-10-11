@@ -105,7 +105,45 @@ npm run dev
 
 ## Deploy (manual — only with your authorization)
 
-- **Frontend (Vercel):** root `frontend/`, set `NEXT_PUBLIC_*`, point `NEXT_PUBLIC_API_URL` at the API
-- **Backend (Render/Railway):** `backend/`, `npm run build` + `npm run start:prod`, set service-role + `FRONTEND_ORIGIN`
+### Frontend (Vercel)
+
+1. Project **Root Directory** = `frontend` (required for this monorepo).
+2. Use the working app URL (e.g. `document-signing-system-six.vercel.app`). A separate project like `document-ss` will 404 if it has no successful deployment.
+3. Environment variables:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_API_URL=https://YOUR-API.onrender.com/api
+```
+
+`NEXT_PUBLIC_API_URL` must **not** be `http://localhost:3001/api` on Vercel — that causes **Failed to fetch** after login.
+
+### Backend on Vercel (recommended for this monorepo)
+
+Use a **second** Vercel project with **Root Directory** = `backend` (NestJS 11 Fluid function — no Render/Railway required). Details: [`docs/VERCEL_BACKEND.md`](./docs/VERCEL_BACKEND.md).
+
+```bash
+cd backend
+npx vercel link   # new project, root = backend
+npx vercel --prod
+```
+
+API env (server only):
+
+```env
+FRONTEND_ORIGIN=https://document-signing-system-six.vercel.app
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Frontend env:
+
+```env
+NEXT_PUBLIC_API_URL=https://YOUR-API-PROJECT.vercel.app/api
+```
+
+Then redeploy the frontend. Never put the service role key on the Next.js project.
 
 Do not deploy or push without explicit authorization.

@@ -17,7 +17,9 @@ import { UsersModule } from './modules/users/users.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // On Vercel, secrets come from project env vars (never from a committed .env)
       envFilePath: ['.env'],
+      ignoreEnvFile: process.env.VERCEL === '1',
       validate: validateEnv,
     }),
     ThrottlerModule.forRoot([

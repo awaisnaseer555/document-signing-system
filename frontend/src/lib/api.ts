@@ -30,10 +30,17 @@ export async function apiFetch<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach API at ${API_URL}. Set NEXT_PUBLIC_API_URL to your deployed NestJS URL (e.g. https://your-api.onrender.com/api).`,
+    );
+  }
 
   if (res.status === 401) {
     throw new Error("Unauthorized");
