@@ -52,14 +52,13 @@ cd frontend && npm install && npm run dev
 
 ---
 
-## Phase 2 — Supabase Foundation
+## Phase 2 — Supabase Foundation ✅
 
-1. Provide SQL migration scripts under `backend/src/database/migrations/` (or `supabase/migrations/`)
-2. Tables: `profiles`, `documents`, `assignments`, `signatures`, `audit_events`
-3. Indexes for assignee, status, due_at, document_id
-4. Document private Storage bucket + path conventions
-5. Document required Supabase Auth settings
-6. Seed strategy for first MANAGEMENT user (manual SQL / Admin API — no hardcoded credentials)
+1. [x] SQL migrations under `supabase/migrations/`
+2. [x] Tables: `profiles`, `documents`, `document_assignments`, `document_signatures`, `document_audit_logs`
+3. [x] Indexes + restrictive RLS + private buckets
+4. [x] Trusted profile bootstrap (always EMPLOYEE); MANAGEMENT via service-role SQL
+5. [x] Seed notes in `supabase/seed-notes.sql`
 
 **Acceptance:** Schema applied in your Supabase project; bucket private; env vars documented.
 

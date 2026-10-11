@@ -9,8 +9,10 @@ export class InviteUserDto {
   @MinLength(2)
   fullName?: string;
 
-  @IsEnum(['EMPLOYEE', 'MANAGEMENT'] as const)
-  role!: 'EMPLOYEE' | 'MANAGEMENT';
+  /** Accepted for backward compatibility; server always creates EMPLOYEE. */
+  @IsOptional()
+  @IsEnum(['EMPLOYEE'] as const)
+  role?: 'EMPLOYEE';
 
   @IsString()
   @MinLength(8)

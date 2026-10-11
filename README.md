@@ -7,23 +7,38 @@ Monorepo: Next.js frontend + NestJS API + Supabase (Auth, Postgres, private Stor
 ## Structure
 
 ```text
-frontend/     Next.js App Router
-backend/      NestJS REST API
-supabase/     schema.sql
+frontend/              Next.js App Router
+backend/               NestJS REST API
+supabase/migrations/   Versioned SQL schema + RLS
+docs/                  Architecture & security notes
 ```
 
 ## One-time Supabase setup
 
-1. Schema is in `supabase/schema.sql` (already applied to the linked project via migration).
-2. Private buckets created: `documents`, `signatures`.
-3. Create users in **Authentication → Users** (or use Management → Invite employee).
-4. Promote a management user:
+1. Apply migrations (see [supabase/README.md](./supabase/README.md)):
+   - New project: `supabase/migrations/20260322120000_initial_schema.sql`
+   - Existing project from older `schema.sql`: also run `20260322120100_harden_rls_and_columns.sql`
+2. Confirm private buckets: `documents`, `signatures`.
+3. Create users via **Authentication → Users** or Management → Invite employee.
+4. Promote a management user (trusted SQL only):
 
 ```sql
 update public.profiles
 set role = 'MANAGEMENT'
 where email = 'manager@example.com';
 ```
+
+### Apply migrations with Supabase CLI
+
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase db push
+```
+
+### Apply with SQL Editor
+
+Open Supabase Dashboard → SQL Editor → paste and run the migration file contents (no credentials inventing; use your project).
 
 ## Environment
 
@@ -47,24 +62,25 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ```
 
-## Run locally
+## Run locally (manual commands)
 
 ```bash
-# Terminal 1
+# Terminal 1 — API
 cd backend
-cp .env.example .env   # then set SERVICE_ROLE_KEY
+cp .env.example .env   # then set real keys
 npm install
 npm run start:dev
 
-# Terminal 2
+# Terminal 2 — UI
 cd frontend
 cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-- UI: http://localhost:3000  
-- API health: http://localhost:3001/api/health  
+- UI: http://localhost:3000
+- API health: http://localhost:3001/api/health
+- Swagger: http://localhost:3001/api/docs
 
 ## Core API
 
@@ -78,10 +94,18 @@ npm run dev
 | GET | `/api/assignments/:id/signed-url` | scoped |
 | POST | `/api/assignments/:id/signatures` | EMPLOYEE |
 | PATCH | `/api/assignments/:id/revoke` | MANAGEMENT |
+| GET | `/api/audit` | MANAGEMENT |
 
-## Deploy (manual)
+## Frontend notes
 
-- **Frontend (Vercel):** set root to `frontend/`, add `NEXT_PUBLIC_*` env vars, point `NEXT_PUBLIC_API_URL` at your API.
-- **Backend (Render/Railway):** Node service from `backend/`, start `npm run start:prod` (build `npm run build`), set server env vars including `SUPABASE_SERVICE_ROLE_KEY` and `FRONTEND_ORIGIN`.
+- Public: login, forgot password, reset password, unauthorized
+- Employee / management dashboards call NestJS via typed `api` helpers (`NEXT_PUBLIC_API_URL`)
+- Light/dark mode via `next-themes`
+- Auth UX is client-side; **authorization is enforced by NestJS**
 
-Do not deploy without explicit authorization.
+## Deploy (manual — only with your authorization)
+
+- **Frontend (Vercel):** root `frontend/`, set `NEXT_PUBLIC_*`, point `NEXT_PUBLIC_API_URL` at the API
+- **Backend (Render/Railway):** `backend/`, `npm run build` + `npm run start:prod`, set service-role + `FRONTEND_ORIGIN`
+
+Do not deploy or push without explicit authorization.

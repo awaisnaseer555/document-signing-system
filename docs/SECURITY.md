@@ -23,15 +23,16 @@ Use `.env` locally and platform env vars in production. Commit only `.env.exampl
 
 ## Authorization Checklist (v1)
 
-- [ ] JWT required on all non-public endpoints
-- [ ] Role checks for management-only operations
-- [ ] Assignment ownership checks for employee file/signature access
-- [ ] Signed URLs minted only after authz
-- [ ] PDF upload MIME/extension/size validation
-- [ ] Revoke blocked after terminal states (e.g. SUBMITTED)
-- [ ] Audit written for sensitive actions
-- [ ] CORS restricted to known frontend origin(s)
-- [ ] No service-role key in Next.js bundle or client components
+- [x] JWT required on all non-public endpoints
+- [x] Role checks for management-only operations
+- [x] Assignment ownership checks for employee file/signature access
+- [x] Signed URLs minted only after authz
+- [x] PDF upload MIME/extension/size validation
+- [x] Revoke blocked after terminal states (SIGNED)
+- [x] Audit written for sensitive actions (append-only for clients)
+- [x] CORS restricted to known frontend origin(s)
+- [x] No service-role key in Next.js bundle or client components
+- [x] RLS blocks employee assignment/signature/audit forgery via PostgREST
 
 ## Employee Isolation
 

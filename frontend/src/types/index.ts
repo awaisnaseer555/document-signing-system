@@ -29,6 +29,7 @@ export interface AssignmentRow {
   due_date: string | null;
   signed_at: string | null;
   viewed_at: string | null;
+  submitted_at?: string | null;
   created_at: string;
   document?: { id: string; title: string; created_at: string };
   assignee?: Profile;
@@ -36,4 +37,17 @@ export interface AssignmentRow {
     | { id: string; signed_pdf_path: string; created_at: string }
     | { id: string; signed_pdf_path: string; created_at: string }[]
     | null;
+}
+
+export interface AuditLogRow {
+  id: string;
+  actor_id: string | null;
+  document_id: string | null;
+  assignment_id: string | null;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  actor?: { id: string; email: string; full_name: string | null } | null;
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser } from "@/types";
 
@@ -22,22 +23,29 @@ export function AppShell({
     router.refresh();
   }
 
-  const home =
-    user.role === "MANAGEMENT" ? "/management" : "/employee";
+  const home = user.role === "MANAGEMENT" ? "/management" : "/employee";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <header className="border-b border-border/80 bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-6">
             <Link href={home} className="text-lg font-semibold tracking-tight">
               DocSign
             </Link>
-            <nav className="flex gap-3 text-sm text-muted-foreground">
+            <nav className="flex flex-wrap gap-3 text-sm text-muted-foreground">
               {user.role === "MANAGEMENT" ? (
-                <Link href="/management" className="hover:text-foreground">
-                  Management
-                </Link>
+                <>
+                  <Link href="/management" className="hover:text-foreground">
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/management/audit"
+                    className="hover:text-foreground"
+                  >
+                    Audit
+                  </Link>
+                </>
               ) : (
                 <Link href="/employee" className="hover:text-foreground">
                   My documents
@@ -50,6 +58,7 @@ export function AppShell({
               <div className="font-medium">{user.fullName ?? user.email}</div>
               <div className="text-xs text-muted-foreground">{user.role}</div>
             </div>
+            <ThemeToggle />
             <Button variant="outline" size="sm" onClick={signOut}>
               Sign out
             </Button>

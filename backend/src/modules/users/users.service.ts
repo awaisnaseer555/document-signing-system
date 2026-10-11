@@ -24,13 +24,16 @@ export class UsersService {
   }
 
   async invite(dto: InviteUserDto) {
+    // Invites always create EMPLOYEE profiles. MANAGEMENT elevation is
+    // service-role SQL only (never client-supplied metadata).
+    const fullName = dto.fullName ?? dto.email.split('@')[0];
+
     const { data, error } = await this.supabase.admin.auth.admin.createUser({
       email: dto.email,
       password: dto.temporaryPassword,
       email_confirm: true,
       user_metadata: {
-        full_name: dto.fullName ?? dto.email.split('@')[0],
-        role: dto.role,
+        full_name: fullName,
       },
     });
 
@@ -38,20 +41,19 @@ export class UsersService {
       throw new BadRequestException(error?.message ?? 'Failed to create user');
     }
 
-    // Ensure role is set even if trigger used default
     await this.supabase.admin
       .from('profiles')
       .update({
-        role: dto.role,
-        full_name: dto.fullName ?? dto.email.split('@')[0],
+        role: 'EMPLOYEE',
+        full_name: fullName,
       })
       .eq('id', data.user.id);
 
     return {
       id: data.user.id,
       email: dto.email,
-      role: dto.role,
-      fullName: dto.fullName ?? dto.email.split('@')[0],
+      role: 'EMPLOYEE' as const,
+      fullName,
     };
   }
 }

@@ -44,10 +44,10 @@ export class DocumentsService {
       actorId: user.id,
       entityType: 'document',
       entityId: documentId,
+      documentId,
       action: 'DOCUMENT_UPLOADED',
       metadata: { title, sizeBytes: file.size },
     });
-
     return data;
   }
 

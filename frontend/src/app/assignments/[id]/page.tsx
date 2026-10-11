@@ -7,7 +7,7 @@ import { PdfViewer } from "@/components/pdf-viewer";
 import { SignaturePad } from "@/components/signature-pad";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api";
+import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser, AssignmentRow } from "@/types";
 
@@ -29,24 +29,25 @@ export default function AssignmentDetailPage() {
           router.replace("/login");
           return;
         }
-        const me = await apiFetch<AuthUser>("/auth/me");
+        const me = await api.auth.me();
         setUser(me);
-        const row = await apiFetch<AssignmentRow>(`/assignments/${params.id}`);
+        const row = await api.assignments.get(params.id);
         setAssignment(row);
 
         if (row.status === "SIGNED") {
-          const signed = await apiFetch<{ url: string }>(
-            `/assignments/${params.id}/signed-url`,
-          );
+          const signed = await api.assignments.signedUrl(params.id);
           setFileUrl(signed.url);
         } else {
-          const original = await apiFetch<{ url: string }>(
-            `/assignments/${params.id}/file-url`,
-          );
+          const original = await api.assignments.fileUrl(params.id);
           setFileUrl(original.url);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
+        const message = err instanceof Error ? err.message : "Failed to load";
+        if (message === "Forbidden" || message === "Unauthorized") {
+          router.replace("/unauthorized");
+          return;
+        }
+        setError(message);
       }
     }
     void boot();
@@ -56,17 +57,9 @@ export default function AssignmentDetailPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await apiFetch<AssignmentRow>(
-        `/assignments/${params.id}/signatures`,
-        {
-          method: "POST",
-          body: JSON.stringify({ signatureDataUrl: dataUrl }),
-        },
-      );
+      const updated = await api.assignments.submitSignature(params.id, dataUrl);
       setAssignment(updated);
-      const signed = await apiFetch<{ url: string }>(
-        `/assignments/${params.id}/signed-url`,
-      );
+      const signed = await api.assignments.signedUrl(params.id);
       setFileUrl(signed.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
@@ -116,7 +109,7 @@ export default function AssignmentDetailPage() {
       </div>
 
       {error ? (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </p>
       ) : null}
@@ -130,8 +123,9 @@ export default function AssignmentDetailPage() {
       ) : null}
 
       {assignment.status === "SIGNED" ? (
-        <p className="mt-4 text-sm text-emerald-700">
-          Signed{assignment.signed_at
+        <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400">
+          Signed
+          {assignment.signed_at
             ? ` on ${new Date(assignment.signed_at).toLocaleString()}`
             : ""}
           . Showing the generated signed PDF.

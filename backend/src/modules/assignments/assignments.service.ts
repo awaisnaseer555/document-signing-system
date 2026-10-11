@@ -72,6 +72,8 @@ export class AssignmentsService {
       actorId: user.id,
       entityType: 'assignment',
       entityId: row.id,
+      documentId: dto.documentId,
+      assignmentId: row.id,
       action: 'ASSIGNED',
       metadata: {
         documentId: dto.documentId,
@@ -172,6 +174,8 @@ export class AssignmentsService {
       actorId: user.id,
       entityType: 'assignment',
       entityId: id,
+      documentId: assignment.document_id ?? assignment.document?.id ?? null,
+      assignmentId: id,
       action: 'VIEWED',
     });
 
@@ -201,6 +205,8 @@ export class AssignmentsService {
       actorId: user.id,
       entityType: 'assignment',
       entityId: id,
+      documentId: assignment.document_id ?? assignment.document?.id ?? null,
+      assignmentId: id,
       action: 'REVOKED',
     });
 

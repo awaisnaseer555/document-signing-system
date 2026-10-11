@@ -80,6 +80,26 @@ export class SignaturesService {
 
     const signedAt = new Date().toISOString();
 
+    // Claim the assignment first to block concurrent duplicate submissions
+    const { data: claimed, error: claimError } = await this.supabase.admin
+      .from('document_assignments')
+      .update({
+        status: 'SIGNED',
+        signed_at: signedAt,
+        submitted_at: signedAt,
+      })
+      .eq('id', assignmentId)
+      .in('status', ['PENDING', 'VIEWED'])
+      .select('id')
+      .maybeSingle();
+
+    if (claimError) {
+      throw new InternalServerErrorException(claimError.message);
+    }
+    if (!claimed) {
+      throw new ConflictException('Assignment already signed or unavailable');
+    }
+
     const { data: signature, error: sigError } = await this.supabase.admin
       .from('document_signatures')
       .insert({
@@ -87,29 +107,37 @@ export class SignaturesService {
         signer_id: user.id,
         signature_image_path: signatureImagePath,
         signed_pdf_path: signedPdfPath,
+        signed_at: signedAt,
+        submission_metadata: {
+          signedAt,
+          composer: 'server-pdf-lib',
+        },
       })
       .select('*')
       .single();
 
     if (sigError || !signature) {
+      // Best-effort rollback of claim if signature insert fails
+      await this.supabase.admin
+        .from('document_assignments')
+        .update({
+          status: assignment.status,
+          signed_at: null,
+          submitted_at: null,
+        })
+        .eq('id', assignmentId)
+        .eq('status', 'SIGNED');
       throw new InternalServerErrorException(
         sigError?.message ?? 'Failed to save signature',
       );
-    }
-
-    const { error: updateError } = await this.supabase.admin
-      .from('document_assignments')
-      .update({ status: 'SIGNED', signed_at: signedAt })
-      .eq('id', assignmentId);
-
-    if (updateError) {
-      throw new InternalServerErrorException(updateError.message);
     }
 
     await this.audit.log({
       actorId: user.id,
       entityType: 'assignment',
       entityId: assignmentId,
+      documentId: assignment.document_id ?? assignment.document?.id ?? null,
+      assignmentId,
       action: 'SIGNED',
       metadata: {
         signedPdfPath,

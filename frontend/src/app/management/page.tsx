@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/api";
+import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser, AssignmentRow, DocumentRow, Profile } from "@/types";
 
@@ -35,13 +35,12 @@ export default function ManagementPage() {
     const current = me ?? user;
     if (!current) return;
     const [emps, docs, assigns] = await Promise.all([
-      apiFetch<Profile[]>("/users/employees"),
-      apiFetch<DocumentRow[]>("/documents"),
-      apiFetch<AssignmentRow[]>(
-        `/assignments${status ? `?status=${status}` : ""}${
-          q ? `${status ? "&" : "?"}q=${encodeURIComponent(q)}` : ""
-        }`,
-      ),
+      api.users.employees(),
+      api.documents.list(),
+      api.assignments.list({
+        status: status || undefined,
+        q: q || undefined,
+      }),
     ]);
     setEmployees(emps);
     setDocuments(docs);
@@ -57,9 +56,9 @@ export default function ManagementPage() {
           router.replace("/login");
           return;
         }
-        const me = await apiFetch<AuthUser>("/auth/me");
+        const me = await api.auth.me();
         if (me.role !== "MANAGEMENT") {
-          router.replace("/employee");
+          router.replace("/unauthorized");
           return;
         }
         setUser(me);
@@ -74,6 +73,19 @@ export default function ManagementPage() {
 
   const filteredAssignments = useMemo(() => assignments, [assignments]);
 
+  const stats = useMemo(() => {
+    const pending = assignments.filter((a) => a.status === "PENDING").length;
+    const viewed = assignments.filter((a) => a.status === "VIEWED").length;
+    const signed = assignments.filter((a) => a.status === "SIGNED").length;
+    const overdue = assignments.filter((a) => {
+      if (!a.due_date || a.status === "SIGNED" || a.status === "REVOKED") {
+        return false;
+      }
+      return a.due_date < new Date().toISOString().slice(0, 10);
+    }).length;
+    return { pending, viewed, signed, overdue, employees: employees.length };
+  }, [assignments, employees.length]);
+
   async function uploadDocument(e: FormEvent) {
     e.preventDefault();
     if (!file) return;
@@ -83,7 +95,7 @@ export default function ManagementPage() {
       const form = new FormData();
       form.append("title", title);
       form.append("file", file);
-      await apiFetch("/documents", { method: "POST", body: form });
+      await api.documents.upload(form);
       setTitle("");
       setFile(null);
       await load();
@@ -99,13 +111,10 @@ export default function ManagementPage() {
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/assignments", {
-        method: "POST",
-        body: JSON.stringify({
-          documentId,
-          assigneeId,
-          dueDate: dueDate || undefined,
-        }),
+      await api.assignments.create({
+        documentId,
+        assigneeId,
+        dueDate: dueDate || undefined,
       });
       setDocumentId("");
       setAssigneeId("");
@@ -123,14 +132,10 @@ export default function ManagementPage() {
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/users/invite", {
-        method: "POST",
-        body: JSON.stringify({
-          email: inviteEmail,
-          fullName: inviteName || undefined,
-          role: "EMPLOYEE",
-          temporaryPassword: invitePassword,
-        }),
+      await api.users.invite({
+        email: inviteEmail,
+        fullName: inviteName || undefined,
+        temporaryPassword: invitePassword,
       });
       setInviteEmail("");
       setInviteName("");
@@ -146,7 +151,7 @@ export default function ManagementPage() {
   async function revoke(id: string) {
     setBusy(true);
     try {
-      await apiFetch(`/assignments/${id}/revoke`, { method: "PATCH" });
+      await api.assignments.revoke(id);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Revoke failed");
@@ -157,9 +162,7 @@ export default function ManagementPage() {
 
   async function downloadSigned(id: string) {
     try {
-      const { url } = await apiFetch<{ url: string }>(
-        `/assignments/${id}/signed-url`,
-      );
+      const { url } = await api.assignments.signedUrl(id);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Download failed");
@@ -215,15 +218,32 @@ export default function ManagementPage() {
       </div>
 
       {error ? (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
           {error}
         </p>
       ) : null}
 
+      <div className="mb-6 grid gap-3 sm:grid-cols-5">
+        {(
+          [
+            ["Employees", stats.employees],
+            ["Pending", stats.pending],
+            ["Viewed", stats.viewed],
+            ["Signed", stats.signed],
+            ["Overdue", stats.overdue],
+          ] as const
+        ).map(([label, value]) => (
+          <div key={label} className="rounded-xl border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-2xl font-semibold">{value}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <form
           onSubmit={uploadDocument}
-          className="space-y-3 rounded-xl border bg-white p-4"
+          className="space-y-3 rounded-xl border bg-card p-4"
         >
           <h2 className="font-medium">Upload PDF</h2>
           <input
@@ -247,7 +267,7 @@ export default function ManagementPage() {
 
         <form
           onSubmit={assignDocument}
-          className="space-y-3 rounded-xl border bg-white p-4"
+          className="space-y-3 rounded-xl border bg-card p-4"
         >
           <h2 className="font-medium">Assign document</h2>
           <select
@@ -289,7 +309,7 @@ export default function ManagementPage() {
 
         <form
           onSubmit={inviteEmployee}
-          className="space-y-3 rounded-xl border bg-white p-4"
+          className="space-y-3 rounded-xl border bg-card p-4"
         >
           <h2 className="font-medium">Invite employee</h2>
           <input
@@ -323,9 +343,9 @@ export default function ManagementPage() {
 
       <section className="mt-8 space-y-3">
         <h2 className="text-lg font-medium">Assignments</h2>
-        <div className="overflow-x-auto rounded-xl border bg-white">
+        <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b bg-slate-50 text-muted-foreground">
+            <thead className="border-b bg-muted/50 text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">Document</th>
                 <th className="px-3 py-2">Employee</th>

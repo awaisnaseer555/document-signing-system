@@ -11,6 +11,8 @@ import {
   Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { IsString, MinLength } from 'class-validator';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,6 +28,8 @@ class UploadDocumentDto {
   title!: string;
 }
 
+@ApiTags('documents')
+@ApiBearerAuth()
 @Controller('documents')
 @UseGuards(AuthGuard, RolesGuard)
 export class DocumentsController {
@@ -33,6 +37,8 @@ export class DocumentsController {
 
   @Post()
   @Roles('MANAGEMENT')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
