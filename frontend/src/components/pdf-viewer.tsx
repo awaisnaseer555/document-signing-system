@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/Page/AnnotationLayer.css";
-import "react-pdf/dist/Page/TextLayer.css";
 import { Button } from "@/components/ui/button";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -42,14 +40,27 @@ export function PdfViewer({ url }: { url: string }) {
           </Button>
         </div>
       </div>
-      <div className="overflow-auto rounded-lg border bg-white p-2">
+      <div className="overflow-auto rounded-lg border bg-white p-2 dark:bg-slate-950">
         <Document
           file={url}
-          onLoadSuccess={({ numPages }) => setPages(numPages)}
-          loading={<p className="p-8 text-sm text-muted-foreground">Loading PDF…</p>}
-          error={<p className="p-8 text-sm text-red-600">Failed to load PDF.</p>}
+          loading={
+            <p className="p-8 text-sm text-muted-foreground">Loading PDF…</p>
+          }
+          error={
+            <p className="p-8 text-sm text-red-600">Failed to load PDF.</p>
+          }
+          onLoadSuccess={({ numPages }) => {
+            setPages(numPages);
+            setPage(1);
+          }}
         >
-          <Page pageNumber={page} width={720} />
+          {/* Skip text/annotation layers for faster first paint */}
+          <Page
+            pageNumber={page}
+            width={Math.min(720, typeof window !== "undefined" ? window.innerWidth - 48 : 720)}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+          />
         </Document>
       </div>
     </div>

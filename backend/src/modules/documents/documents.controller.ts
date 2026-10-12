@@ -19,6 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { pdfFileFilter } from '../../common/pdf-validation';
 import { getMaxPdfBytes } from '../../common/upload-limits';
 import { AuthUser } from '../../common/types';
 import { DocumentsService } from './documents.service';
@@ -43,7 +44,8 @@ export class DocumentsController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: getMaxPdfBytes() },
+      limits: { fileSize: getMaxPdfBytes(), files: 1 },
+      fileFilter: pdfFileFilter,
     }),
   )
   upload(
@@ -53,6 +55,9 @@ export class DocumentsController {
   ) {
     if (!body.title?.trim()) {
       throw new BadRequestException('Title is required');
+    }
+    if (!file) {
+      throw new BadRequestException('PDF file is required');
     }
     return this.documentsService.upload(user, body.title.trim(), file);
   }

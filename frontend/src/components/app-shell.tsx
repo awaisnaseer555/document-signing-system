@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { clearApiTokenCache } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser } from "@/types";
 
@@ -18,6 +19,7 @@ export function AppShell({
 
   async function signOut() {
     const supabase = createClient();
+    clearApiTokenCache();
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();

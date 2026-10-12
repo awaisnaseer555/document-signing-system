@@ -29,18 +29,20 @@ export default function AssignmentDetailPage() {
           router.replace("/login");
           return;
         }
-        const me = await api.auth.me();
+
+        // Parallel: auth + assignment detail
+        const [me, row] = await Promise.all([
+          api.auth.me(),
+          api.assignments.get(params.id),
+        ]);
         setUser(me);
-        const row = await api.assignments.get(params.id);
         setAssignment(row);
 
-        if (row.status === "SIGNED") {
-          const signed = await api.assignments.signedUrl(params.id);
-          setFileUrl(signed.url);
-        } else {
-          const original = await api.assignments.fileUrl(params.id);
-          setFileUrl(original.url);
-        }
+        const urlRes =
+          row.status === "SIGNED"
+            ? await api.assignments.signedUrl(params.id)
+            : await api.assignments.fileUrl(params.id);
+        setFileUrl(urlRes.url);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load";
         if (message === "Forbidden" || message === "Unauthorized") {

@@ -19,9 +19,19 @@ export class AssignmentsService {
     private readonly audit: AuditService,
   ) {}
 
-  private assignmentSelect = `
-    *,
-    document:documents(*),
+  /** Lightweight columns for list endpoints (faster dashboard loads). */
+  private listSelect = `
+    id, document_id, assignee_id, assigned_by, status, due_date,
+    viewed_at, signed_at, submitted_at, created_at,
+    document:documents(id, title, created_at),
+    assignee:profiles!document_assignments_assignee_id_fkey(id, email, full_name, role),
+    signature:document_signatures(id, signed_pdf_path, created_at)
+  `;
+
+  private detailSelect = `
+    id, document_id, assignee_id, assigned_by, status, due_date,
+    viewed_at, signed_at, submitted_at, created_at,
+    document:documents(id, title, original_storage_path, created_at),
     assignee:profiles!document_assignments_assignee_id_fkey(id, email, full_name, role),
     assigner:profiles!document_assignments_assigned_by_fkey(id, email, full_name),
     signature:document_signatures(id, signed_pdf_path, created_at, signer_id)
@@ -57,7 +67,7 @@ export class AssignmentsService {
         due_date: dto.dueDate ?? null,
         status: 'PENDING',
       })
-      .select(this.assignmentSelect)
+      .select(this.detailSelect)
       .single();
 
     if (error || !data) {
@@ -88,8 +98,9 @@ export class AssignmentsService {
   async list(user: AuthUser, status?: string, q?: string) {
     let query = this.supabase.admin
       .from('document_assignments')
-      .select(this.assignmentSelect)
-      .order('created_at', { ascending: false });
+      .select(this.listSelect)
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (user.role === 'EMPLOYEE') {
       query = query.eq('assignee_id', user.id).neq('status', 'REVOKED');
@@ -125,7 +136,7 @@ export class AssignmentsService {
   async getAuthorized(user: AuthUser, id: string) {
     const { data, error } = await this.supabase.admin
       .from('document_assignments')
-      .select(this.assignmentSelect)
+      .select(this.detailSelect)
       .eq('id', id)
       .maybeSingle();
 
@@ -161,7 +172,7 @@ export class AssignmentsService {
         viewed_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select(this.assignmentSelect)
+      .select(this.detailSelect)
       .single();
 
     if (error || !data) {
@@ -192,7 +203,7 @@ export class AssignmentsService {
       .from('document_assignments')
       .update({ status: 'REVOKED' })
       .eq('id', id)
-      .select(this.assignmentSelect)
+      .select(this.detailSelect)
       .single();
 
     if (error || !data) {

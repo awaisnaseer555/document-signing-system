@@ -1,35 +1,15 @@
-import {
-  BadRequestException,
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import { getMaxPdfBytes, getMaxPdfLabel } from '../../common/upload-limits';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { assertStrictPdf } from '../../common/pdf-validation';
 import { SupabaseService } from '../supabase/supabase.service';
 
-const SIGNED_URL_TTL_SECONDS = 120;
+const SIGNED_URL_TTL_SECONDS = 180;
 
 @Injectable()
 export class StorageService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  assertPdf(file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('PDF file is required');
-    }
-    const maxBytes = getMaxPdfBytes();
-    if (file.size > maxBytes) {
-      throw new BadRequestException(`PDF exceeds ${getMaxPdfLabel()} limit`);
-    }
-    const name = file.originalname?.toLowerCase() ?? '';
-    const mimeOk =
-      file.mimetype === 'application/pdf' || name.endsWith('.pdf');
-    if (!mimeOk) {
-      throw new BadRequestException('Only PDF files are allowed');
-    }
-  }
-
   async uploadOriginalPdf(documentId: string, file: Express.Multer.File) {
-    this.assertPdf(file);
+    assertStrictPdf(file);
     const path = `originals/${documentId}/${Date.now()}.pdf`;
     const { error } = await this.supabase.admin.storage
       .from('documents')

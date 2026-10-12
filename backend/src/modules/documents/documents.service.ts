@@ -52,19 +52,17 @@ export class DocumentsService {
   }
 
   async list() {
+    // Slim select — management UI loads assignments separately
     const { data, error } = await this.supabase.admin
       .from('documents')
       .select(
         `
-        *,
-        uploader:profiles!documents_uploaded_by_fkey(id, email, full_name),
-        assignments:document_assignments(
-          id, status, due_date, signed_at, created_at,
-          assignee:profiles!document_assignments_assignee_id_fkey(id, email, full_name)
-        )
+        id, title, size_bytes, created_at, uploaded_by,
+        uploader:profiles!documents_uploaded_by_fkey(id, email, full_name)
       `,
       )
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) {
       throw new InternalServerErrorException(error.message);

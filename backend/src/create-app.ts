@@ -23,24 +23,36 @@ export async function createApp(): Promise<INestApplication> {
 
   const allowedOrigins = frontendOrigin
     .split(',')
-    .map((o) => o.trim().replace(/\/$/, ''))
+    .map((o) => {
+      const trimmed = o.trim();
+      if (!trimmed) return '';
+      try {
+        // Origin must be scheme + host (+ port). Strip paths like /login if pasted by mistake.
+        return new URL(trimmed).origin;
+      } catch {
+        return trimmed.replace(/\/$/, '');
+      }
+    })
     .filter(Boolean);
 
   app.enableCors({
     origin: (
       origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
+      callback: (err: Error | null, allow?: boolean | string) => void,
     ) => {
+      // Non-browser clients (health checks) send no Origin
       if (!origin) {
         callback(null, true);
         return;
       }
       const normalized = origin.replace(/\/$/, '');
       if (allowedOrigins.includes(normalized)) {
-        callback(null, true);
+        // Echo the request origin (required with credentials: true)
+        callback(null, normalized);
         return;
       }
-      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+      // Deny without throwing — throwing can surface as opaque "Failed to fetch"
+      callback(null, false);
     },
     credentials: true,
   });

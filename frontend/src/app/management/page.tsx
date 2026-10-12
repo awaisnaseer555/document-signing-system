@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { assertClientPdf } from "@/lib/pdf";
 import { createClient } from "@/lib/supabase/client";
 import { AuthUser, AssignmentRow, DocumentRow, Profile } from "@/types";
 
@@ -31,20 +32,44 @@ export default function ManagementPage() {
   const [inviteName, setInviteName] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
 
-  async function load(me?: AuthUser) {
+  async function load(
+    me?: AuthUser,
+    parts: Array<"employees" | "documents" | "assignments"> = [
+      "employees",
+      "documents",
+      "assignments",
+    ],
+  ) {
     const current = me ?? user;
     if (!current) return;
-    const [emps, docs, assigns] = await Promise.all([
-      api.users.employees(),
-      api.documents.list(),
-      api.assignments.list({
-        status: status || undefined,
-        q: q || undefined,
-      }),
-    ]);
-    setEmployees(emps);
-    setDocuments(docs);
-    setAssignments(assigns);
+    const tasks: Promise<void>[] = [];
+    if (parts.includes("employees")) {
+      tasks.push(
+        api.users.employees().then((emps) => {
+          setEmployees(emps);
+        }),
+      );
+    }
+    if (parts.includes("documents")) {
+      tasks.push(
+        api.documents.list().then((docs) => {
+          setDocuments(docs);
+        }),
+      );
+    }
+    if (parts.includes("assignments")) {
+      tasks.push(
+        api.assignments
+          .list({
+            status: status || undefined,
+            q: q || undefined,
+          })
+          .then((assigns) => {
+            setAssignments(assigns);
+          }),
+      );
+    }
+    await Promise.all(tasks);
   }
 
   useEffect(() => {
@@ -86,19 +111,35 @@ export default function ManagementPage() {
     return { pending, viewed, signed, overdue, employees: employees.length };
   }, [assignments, employees.length]);
 
+  async function onPickFile(selected: File | null) {
+    setError(null);
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    try {
+      await assertClientPdf(selected);
+      setFile(selected);
+    } catch (err) {
+      setFile(null);
+      setError(err instanceof Error ? err.message : "Invalid PDF");
+    }
+  }
+
   async function uploadDocument(e: FormEvent) {
     e.preventDefault();
     if (!file) return;
     setBusy(true);
     setError(null);
     try {
+      await assertClientPdf(file);
       const form = new FormData();
       form.append("title", title);
       form.append("file", file);
       await api.documents.upload(form);
       setTitle("");
       setFile(null);
-      await load();
+      await load(undefined, ["documents"]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -119,7 +160,7 @@ export default function ManagementPage() {
       setDocumentId("");
       setAssigneeId("");
       setDueDate("");
-      await load();
+      await load(undefined, ["assignments"]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Assign failed");
     } finally {
@@ -140,7 +181,7 @@ export default function ManagementPage() {
       setInviteEmail("");
       setInviteName("");
       setInvitePassword("");
-      await load();
+      await load(undefined, ["employees"]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invite failed");
     } finally {
@@ -152,7 +193,7 @@ export default function ManagementPage() {
     setBusy(true);
     try {
       await api.assignments.revoke(id);
-      await load();
+      await load(undefined, ["assignments"]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Revoke failed");
     } finally {
@@ -257,9 +298,10 @@ export default function ManagementPage() {
             required
             type="file"
             accept="application/pdf,.pdf"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}
             className="w-full text-sm"
           />
+          <p className="text-xs text-muted-foreground">PDF only (.pdf)</p>
           <Button type="submit" disabled={busy || !file}>
             Upload
           </Button>

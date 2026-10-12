@@ -9,10 +9,26 @@ import type {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api";
 
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
 async function getAccessToken() {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) {
+    return cachedToken.value;
+  }
   const supabase = createClient();
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  const token = data.session?.access_token ?? null;
+  if (token) {
+    // Avoid getSession() on every parallel API call in the same page load
+    cachedToken = { value: token, expiresAt: Date.now() + 30_000 };
+  } else {
+    cachedToken = null;
+  }
+  return token;
+}
+
+export function clearApiTokenCache() {
+  cachedToken = null;
 }
 
 export async function apiFetch<T>(
@@ -38,7 +54,7 @@ export async function apiFetch<T>(
     });
   } catch {
     throw new Error(
-      `Cannot reach API at ${API_URL}. Set NEXT_PUBLIC_API_URL to your deployed NestJS URL (e.g. https://your-api.onrender.com/api).`,
+      `Cannot reach API at ${API_URL}. Check: (1) API is online, (2) NEXT_PUBLIC_API_URL is correct, (3) backend FRONTEND_ORIGIN includes this site’s exact origin (CORS).`,
     );
   }
 
